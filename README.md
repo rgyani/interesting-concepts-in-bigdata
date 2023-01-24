@@ -12,8 +12,8 @@ This approach works well when the number of servers remains constant. However, w
 
 Here is when consistent hashing comes into picture.
 
-The central idea is, **we use a hash function that randomly maps both the data keys and servers to a unit circle**, usually `2 pi  radians`. 
-So, as the diagram below, the 5 servers are placed in a ring (360 degrees) based on the hash of their ID or IP Address
+The central idea is, **we use a hash function that randomly maps both the data keys and servers to a unit circle**, usually `2 pi  radians`.   
+So, as the diagram below, the 5 servers are placed in a ring (360 degrees) based on the hash of their ID or IP Address   
 Each **incoming data key is also then hashed and assigned to the next server that appears on the circle in clockwise order**
 
 ![img](imgs/Consistent_Hashing_Sample_Illustration.png)
@@ -61,8 +61,8 @@ SELECT * FROM MyTable WHERE LEFT(Geohash, 4) IN ('ezzz', 'gbpb, 'u000', 'spbp', 
 
 Advantages of Geohash
 1. Very easy to find the parent cell, by simply truncating the geohash
-2. Very quick calculation to find the adjoining 8 cells
-
+2. **Very quick calculation to find the adjoining 8 cells**
+3. Very quick conversion between GeoHash and Lat,Long and vice-versa 
 
 # Consensus Protocols
 
@@ -97,7 +97,7 @@ There are 3 roles in Paxos:
 
 1. Proposers
 2. Acceptors
-3. Listeners
+3. Listeners   
 Any actor can take on any role at a given point in time.
 
 ![img](imgs/paxos.png)
@@ -113,6 +113,7 @@ Raft can be described as a simpler version of Paxos. It was designed for being m
 
 Raft decomposes consensus into leader election and log propagation phases. After leader election, leader takes all the decisions and communicates to other nodes through ordered logs.
 
+**Kafka 3.0 has replaced zookeeper based meta-data management with Kafka Raft**
 
 # B-tree vs Log-Structured Merge-tree
 The B-tree and the Log-Structured Merge-tree (LSM-tree) are the two most widely used data structures for data-intensive applications to organize and store data. However, each of them has its own advantages and disadvantages. This article aims to use quantitative approaches to compare these two data structures.
@@ -144,3 +145,43 @@ Log-structured merge-tree is a data structure with performance characteristics t
 | Find-min | O(log n) | O(N) |
 | Delete | O(log n) | O(N) |
 
+
+
+# Merkel Trees
+
+In cryptography and computer science, a hash tree or Merkle tree is a tree in which every "leaf" (node) is labelled with the cryptographic hash of its data block, and every node that is not a leaf ("branch") is labelled with the cryptographic hash of the labels of its child nodes. 
+
+A hash tree allows **efficient and secure verification of the contents of a large data structure**. 
+
+![img](imgs/Hash_Tree.svg.png)
+
+
+Hash trees can be used to verify any kind of data stored, handled and transferred in and between computers. They can help ensure that data blocks received from other peers in a peer-to-peer network are received undamaged and unaltered, and even to check that the other peers do not lie and send fake blocks.
+
+Hash trees are used in hash-based cryptography, Apache Wave protocol; **Git** and Mercurial distributed revision control systems; and a number of NoSQL systems such as **Apache Cassandra**, Riak, and **Dynamo**.  
+Suggestions have been made to use hash trees in trusted computing systems.
+
+
+# Leaky Bucket Algorithm
+The leaky bucket algorithm is a method of congestion control where multiple packets are stored temporarily. These packets are sent to the network at a constant rate that is decided between the sender and the network. This algorithm is used to implement congestion control through traffic shaping in data networks.
+
+To understand the algorithm, let us first discuss the analogy of a leaky bucket.
+
+Consider a bucket with a small hole at the bottom. Now imagine that water is poured into the bucket at random intervals. At each interval, the amount of water poured into the bucket is not fixed. Now it does not matter how much water is inside the bucket, the water comes out at a constant rate from the hole. Consider the image below for more clarity.
+
+![img](imgs/leaky_bucket.png)
+
+Note the following
+* The rate at which water leaks (called the leak rate) is independent of the amount of water inside the bucket.
+* If the bucket becomes full, the water poured will be lost. 
+The same idea of the leaky bucket can be applied to the data packets.
+
+
+### Implementation
+The leaky bucket algorithm can be implemented using a FIFO (First In First Out) queue. Packets that arrive first in the bucket should be transmitted first.
+
+* A queue acts as a bucket or a buffer to hold the packets. This is implemented in the host operating system.
+* Packets from the host are pushed into the queue as they arrive.
+* At some intervals, the packets are sent to the network depending upon the leak rate. Generally, this interval is a clock tick. A clock tick is an interrupt generated from the physical clock to the processor.
+* This leak rate is predetermined by the network. A network will guarantee some dedicated bandwidth for each host. This dedicated bandwidth can be used to set up this leak rate.
+* **If this queue is full, then the packets that arrive will be discarded.**
