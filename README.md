@@ -114,7 +114,7 @@ Raft is generally seen as more understandable and simpler to implement than Paxo
 
 ##  Byzantine Failure
 
-Consensus algorithms are typically either Byzantine Fault Tolerant, or not. Succinctly, systems which can withstand Byzantine faults are able to withstand misbehaving peers. Most distributed systems such as Kafka, etcd, are not Byzantine Fault Tolerant.  
+Consensus algorithms are typically either Byzantine Fault Tolerant, or not. Succinctly, systems which can withstand Byzantine faults are able to withstand misbehaving peers. Most distributed systems such as Kafka, etcd, are not Byzantine Fault Tolerant.  Neither Paxos nor Raft is Byzantine Fault Tolerant (BFT).
 
 In order to withstand Byzantine faults, the system must tolerate peers:
 * actively spreading incorrect information,
