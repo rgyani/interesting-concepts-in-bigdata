@@ -145,16 +145,53 @@ Any actor can take on any role at a given point in time.
 
 Proposer proposes an id, it gets accepted by a majority, and then the Proposer proposes a value with that id. Please note that Acceptor 3 has not responded with Promise id. A consensus has been reached for this value and this value is propagated to all the nodes including listener.
 
-
-## Gossip
-Gossip is about letting each node send the latest information it happens to have to some set of other nodes eventually spreading that information throughout the network. Gossip protocols are at best eventually consistent, but aren't even necessarily that. And if there's a partition, nodes in sub-partitions will still happily gossip with each other. So a request that hits one side of a partition can get totally different answers than if it hits another side.
-
 ## Raft
 Raft can be described as a simpler version of Paxos. It was designed for being more understandable than Paxos. It is a fairly new protocol, being developed in 2014. Raft is used in etcd, consul, docker to name a few. 
 
 Raft decomposes consensus into leader election and log propagation phases. After leader election, leader takes all the decisions and communicates to other nodes through ordered logs.
 
-**Kafka 3.0 has replaced zookeeper based meta-data management with Kafka Raft**
+### Node States
+Every node in Raft is always in one of three states:
+- **Follower** — passive, just receives messages
+- **Candidate** — actively trying to become leader
+- **Leader** — handles all client requests, sends heartbeats
+
+### The Core Concept: Terms
+Raft divides time into terms — logical clock periods numbered 1, 2, 3, etc. Each term begins with an election attempt.   Terms are the key to detecting stale leaders.
+
+### Step-by-Step Election Process
+1. **Heartbeat timeout (election starts)**     
+Followers expect regular heartbeats from the leader. If a follower doesn't hear one within the election timeout (randomized, typically 150–300ms), it assumes the leader is dead and starts an election.
+2. **Become a candidate**  
+The follower increments its current term, transitions to Candidate, and votes for itself.
+3. **Request votes**  
+The candidate sends a **RequestVote RPC** to all other nodes, including:
+    - Its current term number
+    - Its log's last index and last term (to prove it's up to date)
+4. **Others decide whether to vote**  
+A node grants its vote only if:
+    - It hasn't already voted in this term, AND
+    - The candidate's log is at least as up-to-date as its own (this is critical for safety — you don't want a stale node becoming leader)
+5. **Win the election**  
+If the candidate gets votes from a majority (quorum) of nodes, it becomes leader and immediately starts sending heartbeats to suppress new elections.
+
+### What Can Go Wrong (and how Raft handles it)
+1. **Split vote** — two candidates start elections simultaneously and split the votes, so nobody gets a majority.   
+Raft handles this with randomized timeouts — each node waits a random duration before starting an election, making it unlikely two nodes time out at exactly the same time. If a split happens anyway, everyone waits again with a new random timeout.
+2. **Old leader comes back** — a previously crashed leader rejoins.   
+When it receives a message with a higher term number than its own, it immediately steps down to follower. The term number acts as a "you're out of date" signal.
+3. **Network partition** — a leader gets cut off from the majority.   
+The isolated leader keeps thinking it's in charge, but the majority side will elect a new leader. When the partition heals, the old leader sees a higher term and steps down. This means there were briefly two leaders, but the isolated one couldn't commit anything (it couldn't reach a quorum), so no data corruption occurs.
+
+### Why Randomized Timeouts are Clever
+This is one of Raft's key insights. Instead of a complex tie-breaking protocol, it just makes simultaneous elections statistically rare. The node that times out first sends RequestVote messages to everyone else, and since it reaches them before they time out themselves, they reset their timers and grant the vote. In practice, the first candidate almost always wins cleanly.
+
+**Kafka 3.3-4.0 has replaced zookeeper based meta-data management with Kafka Raft.**
+
+
+## Gossip
+Gossip is about letting each node send the latest information it happens to have to some set of other nodes eventually spreading that information throughout the network. Gossip protocols are at best eventually consistent, but aren't even necessarily that. And if there's a partition, nodes in sub-partitions will still happily gossip with each other. So a request that hits one side of a partition can get totally different answers than if it hits another side.
+
 
 # B-tree vs Log-Structured Merge-tree
 The B-tree and the Log-Structured Merge-tree (LSM-tree) are the two most widely used data structures for data-intensive applications to organize and store data. However, each of them has its own advantages and disadvantages. This article aims to use quantitative approaches to compare these two data structures.
