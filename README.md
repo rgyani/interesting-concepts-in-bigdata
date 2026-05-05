@@ -192,7 +192,44 @@ This is one of Raft's key insights. Instead of a complex tie-breaking protocol, 
 ## Gossip
 Gossip is about letting each node send the latest information it happens to have to some set of other nodes eventually spreading that information throughout the network. Gossip protocols are at best eventually consistent, but aren't even necessarily that. And if there's a partition, nodes in sub-partitions will still happily gossip with each other. So a request that hits one side of a partition can get totally different answers than if it hits another side.
 
+The gossip protocol is inspired by how rumours spread in real life
 
+The core idea: in a distributed system with many nodes (servers, replicas, peers), you need every node to eventually know some piece of information — a config change, a node failure, a new value. The naive approach is broadcasting: one node tells everyone. That works at small scale but hammers the network and creates a single point of failure.  
+Gossip does it differently. When a node learns something new, it picks a small random subset of its peers (say, 3) and tells them. Each of those nodes then picks 3 more random peers and tells them. And so on. Each round, the number of informed nodes roughly doubles — exponential spread, just like a real epidemic.
+
+The three key properties that make it useful:
+1. it's decentralised. No node is in charge. There's no coordinator, no single point of failure. Any node can originate a message.
+2. it's resilient. Because nodes are chosen randomly every round, the message travels many different paths through the network. Even if several nodes are down, the gossip routes around them.
+3. it's eventually consistent. It doesn't guarantee every node is informed by a specific moment — but given enough rounds (logarithmic in the cluster size), the probability of full coverage approaches 1. In practice, a cluster of 1,000 nodes reaches full coverage in around 10 rounds.
+
+**The tradeoff:** you get duplicate messages. A node will often hear the same thing from multiple peers. Systems using gossip need to be idempotent — hearing something twice must be harmless. This is usually solved by attaching a version number or timestamp, and nodes simply ignore updates they've already seen.
+**Where it's actually used:**   
+1. Cassandra and DynamoDB use gossip to propagate cluster membership — nodes learn which other nodes are alive or dead.
+2. Redis Cluster uses it the same way.
+3. Amazon S3 uses a gossip-like protocol for replication state.
+4. The serf tool by HashiCorp is basically gossip as a standalone service.
+
+## 2-Phase Commit (2PC)
+**The problem it solves:** you have a distributed transaction spanning multiple nodes (e.g., debit from bank A, credit to bank B). Either both happen or neither does. How do you coordinate that?  
+
+2PC has a coordinator node and several participant nodes. It runs in two phases:
+- In phase 1 (prepare), the coordinator asks all participants "can you commit this transaction?" Each participant writes the transaction to a durable log, locks the relevant resources, and votes either Yes or No.
+- In phase 2 (commit), if every participant voted Yes, the coordinator sends Commit to all of them and they apply the change. If anyone voted No, it sends Abort and everyone rolls back.
+  
+The fatal flaw is what happens if the coordinator crashes after participants have voted Yes but before sending Commit. The participants are now stuck — they hold locks, they can't commit on their own (maybe others voted No), and they can't abort safely (maybe the coordinator already told some nodes to commit). They just sit there blocked, potentially forever. This is called the blocking problem.
+
+## 3-Phase Commit (3PC)
+3PC inserts an extra phase specifically to eliminate the blocking problem. The insight is: if participants can figure out the coordinator's intent even when it's dead, they can proceed without it.
+- Phase 1 (CanCommit) is the same as 2PC's prepare — participants vote Yes or No.
+- Phase 2 (PreCommit) is new. If all votes were Yes, the coordinator sends a PreCommit message. Participants acknowledge it, but don't commit yet. This acknowledgement is the key — it means every participant now knows that every other participant voted Yes.
+- Phase 3 (DoCommit) — the coordinator sends the final Commit, participants apply and release locks.
+
+Why does the extra phase help? Because now, if the coordinator crashes, a participant can look at its own state and reason about what to do. If it received PreCommit, it knows all others also voted Yes (otherwise PreCommit would never have been sent), so it's safe to commit without the coordinator. If it never received PreCommit, it knows it's safe to abort. Either way, it can proceed — no blocking.
+
+### So why doesn't everyone use 3PC?
+Because it trades one problem for another. 3PC assumes nodes can't be isolated from each other — it assumes that if the coordinator is unreachable, it must be dead. In real networks, you get network partitions: the coordinator is alive, some participants can reach it, others can't. In that scenario, 3PC can cause a split-brain — the isolated group decides to abort while the connected group commits. You now have an inconsistent system, which is arguably worse than a blocked one.  
+**This is why modern systems generally don't use either protocol in pure form. They use Paxos or Raft instead, which handle partitions correctly by requiring a quorum** — a majority of nodes must agree before anything is committed, so you can never get two groups making conflicting decisions simultaneously.
+The practical summary: 2PC blocks on coordinator failure. 3PC avoids blocking but breaks under network partitions. Neither is fully safe in a real distributed environment, which is why consensus algorithms exist.
 # B-tree vs Log-Structured Merge-tree
 The B-tree and the Log-Structured Merge-tree (LSM-tree) are the two most widely used data structures for data-intensive applications to organize and store data. However, each of them has its own advantages and disadvantages. This article aims to use quantitative approaches to compare these two data structures.
 
