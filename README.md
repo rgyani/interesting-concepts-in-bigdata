@@ -123,13 +123,10 @@ In order to withstand Byzantine faults, the system must tolerate peers:
 
 In order to better understand Byzantine Fault Tolerance it helps to imagine the Byzantine Generals Problem:
 
-```
-Several Byzantine generals and their armies have surrounded an enemy army inside a deep forest. Separate, they are not strong enough to defeat the enemy, but if they attack in a coordinated fashion they will succeed. They must all agree on a time to attack the enemy.
+>Several Byzantine generals and their armies have surrounded an enemy army inside a deep forest. Separate, they are not strong enough to defeat the enemy, but if they attack in a coordinated fashion they will succeed. They must all agree on a time to attack the enemy.
+>In order to communicate, the generals can send messengers through the forest. These messages may or may not reach their destination. They could be kidnapped and replaced with imposters, converted to the enemy cause, or outright killed.
+>How can the generals confidently coordinate a time to attack?
 
-In order to communicate, the generals can send messengers through the forest. These messages may or may not reach their destination. They could be kidnapped and replaced with imposters, converted to the enemy cause, or outright killed.
-
-How can the generals confidently coordinate a time to attack?
-```
 
 ## Paxos
 Paxos is a consensus protocol. It requires a quorum (more than half) of the nodes to agree on something before it's "true". CAP availability means that if a node isn't down it must respond, but if there's a partition that splits a network of n Paxos nodes then the part(s) of the network that can't talk to n/2 nodes won't be able to have a quorum and thus won't reach consensus so they won't be available for requests that need consensus. In fact, for some kinds of partitions it's possible that no sub-partition will have a quorum.
