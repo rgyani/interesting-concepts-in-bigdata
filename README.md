@@ -105,6 +105,67 @@ Advantages of Geohash
 2. **Very quick calculation to find the adjoining 8 cells**
 3. Very quick conversion between GeoHash and Lat,Long and vice-versa 
 
+### 1. Calculating Geohash
+The core mathematical operation behind a Geohash is **Binary Range Partitioning** combined with **Bit Interleaving.**
+
+#### Step 1: Binary Range Partition
+To convert a latitude or longitude coordinate into its binary representation, you repeatedly bisect the coordinate space.
+* Longitude range: [-180.0, 180.0]  
+* Latitude range: [-90.0, 90.0]
+
+For each bit of precision you want, you calculate the midpoint of the current range ($mid = \frac{min + max}{2}$).
+* If the coordinate is $\ge mid$, the bit is 1, and the new range becomes $[mid, max]$.
+* If the coordinate is $< mid$, the bit is 0, and the new range becomes $[min, mid]$.
+
+#### Example
+Let's find the first 5 bits for Latitude 37.7749.
+1. Initial Range: $[-90, 90]$. $mid = 0$
+    * .$37.7749 \ge 0 \rightarrow$ Bit: 1. New Range: $[0, 90]$
+2. Current Range: $[0, 90]$. $mid = 45$.
+    * $37.7749 < 45 \rightarrow$ Bit: 0. New Range: $[0, 45]$
+3. Current Range: $[0, 45]$. $mid = 22.5$.
+    * $37.7749 \ge 22.5 \rightarrow$ Bit: 1. New Range: $[22.5, 45]$
+4. Current Range: $[22.5, 45]$. $mid = 33.75$.
+    * $37.7749 \ge 33.75 \rightarrow$ Bit: 1. New Range: $[33.75, 45]$
+5. Current Range: $[33.75, 45]$. $mid = 39.375$.
+    * $37.7749 < 39.375 \rightarrow$ Bit: 0. New Range: $[33.75, 39.375]$
+
+Latitude Binary String: **10110 (5 bits)**. You do the exact same math for Longitude.
+
+#### Step 2: Bit Interleaving (Morton Z-Order Space)
+Once you have the binary arrays for both, you interleave them. 
+* Longitude always takes the even bits (0, 2, 4...) and 
+* Latitude takes the odd bits (1, 3, 5...).
+
+#### Step 3: Bast32 Encoding
+Geohash uses a specific 32-character alphabet (excluding a, i, l, o to avoid confusion). You slice the interleaved bit sequence into 5-bit chunks. Each 5-bit chunk is just an integer from $0$ to $31$, which acts as the direct index into the character array
+
+### 2. Calculating Neighbor Cells
+##### Step 1. De-interleave the hash into integer coordinated, we get
+1. X: the binary representation of the longitude grid index
+2. Y: the binary representation of the longitude grid index
+
+##### Step 2: Apply Matrix Offset
+To get all 8 neighbors, you simply add or subtract 1 from your integer coordinates using a standard grid offset matrix:
+| Neighbor | Offset (ΔX, ΔY)|
+|---|---|
+| North | $(0, +1)$ |
+| North-East| $(+1, +1)$ |
+| East | $(+1, 0)$|
+| South-East|$(+1, -1)$|
+| South | $(0, -1)$|
+| South-West |$(-1, -1)$ |
+|West | $(-1, 0)$|
+
+##### Handling Edge Conditions (The Math of the Globe)
+Because the earth is a sphere, the math accounts for boundaries via simple modulo arithmetic and clamping:
+* Longitude (X-Axis) Wraps Around: If $X_{\text{int}} + \Delta X > X_{\text{max}}$, it wraps around to $0$ via a modulo operation ($X_{\text{new}} \pmod{2^X}$). This seamlessly handles the International Date Line.
+* Latitude (Y-Axis) Clamps: If $Y_{\text{int}} + \Delta Y$ goes past the North or South poles, the neighbor calculation usually caps at the pole, or flips longitude depending on the specific edge-case implementation.
+
+##### Step 3: Re-interleave and Re-encode
+Once you have the new neighbor coordinate pair (e.g., $X_{\text{int}} + 1, Y_{\text{int}} - 1$), you interleave those two integers back into a single bitstream using standard bitwise shifts, group them by 5 bits, and map them back to the Base32 string.
+
+
 # Consensus Protocols
 
 When building a distributed system, one principal goal is to build in fault-tolerance. That is, if one particular node in the network goes down, or if there is a network partition, the system should continue to operate in a consistent way, i.e., nodes in the system should have a consensus on the state (or simply “values”) of the system. The consensus should be considered final once it is reached, even if some nodes were in faulty states at the time of decision.
