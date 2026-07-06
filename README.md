@@ -137,7 +137,7 @@ Once you have the binary arrays for both, you interleave them.
 * Longitude always takes the even bits (0, 2, 4...) and 
 * Latitude takes the odd bits (1, 3, 5...).
 
-#### Step 3: Bast32 Encoding
+#### Step 3: Base32 Encoding
 Geohash uses a specific 32-character alphabet (excluding a, i, l, o to avoid confusion). You slice the interleaved bit sequence into 5-bit chunks. Each 5-bit chunk is just an integer from $0$ to $31$, which acts as the direct index into the character array
 
 ### 2. Calculating Neighbor Cells
