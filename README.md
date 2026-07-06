@@ -120,7 +120,7 @@ For each bit of precision you want, you calculate the midpoint of the current ra
 #### Example
 Let's find the first 5 bits for Latitude 37.7749.
 1. Initial Range: $[-90, 90]$. $mid = 0$
-    * .$37.7749 \ge 0 \rightarrow$ Bit: 1. New Range: $[0, 90]$
+    * $37.7749 \ge 0 \rightarrow$ Bit: 1. New Range: $[0, 90]$
 2. Current Range: $[0, 90]$. $mid = 45$.
     * $37.7749 < 45 \rightarrow$ Bit: 0. New Range: $[0, 45]$
 3. Current Range: $[0, 45]$. $mid = 22.5$.
